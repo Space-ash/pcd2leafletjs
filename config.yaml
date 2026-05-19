@@ -1,0 +1,42 @@
+# pcd2leafletjs 全局配置文件
+# 所有相对路径均相对于此项目根目录进行解析
+
+paths:
+  input_pcd: inputs/scans.pcd
+  output_png: outputs/ortho_map.png
+  tiles_dir: outputs/tiles
+  metadata_json: outputs/map_meta.json
+  metadata_js: outputs/map_meta.js
+
+downsample:
+  # 仅用于降低点云密度以加快处理速度。
+  # 它不决定最终 Leaflet 地图的物理尺寸。
+  enable: false
+  voxel_size: 0.05
+
+raster:
+  # 物理坐标（米）到图像像素映射的唯一真理。
+  # 单位：米/像素，默认 PCD 点云中的坐标单位为米。
+  resolution: 0.01
+
+morphology:
+  # 填充栅格化后的内部微小空洞，不改变地图的物理尺度。
+  # 依赖 scipy 库。膨胀或闭操作仅用于粘合局部网格，绝不改变整体边界。
+  enable: true
+  kernel_size: 3       # 局部膨胀核大小，建议设为 3 或 5
+  iterations: 1        # 迭代次数
+  fill_remaining_with_nearest: false
+
+z_export:
+  # 导出降采样后的 Z 轴网格到 outputs/map_meta.js 中，供静态前端页面离线反查。
+  # z_scale: 4 代表每 4x4 的 PNG 像素共享一个导出的 Z 轴高度采样值。
+  z_scale: 4
+  decimals: 3 # 导出 Z 轴高度值的小数位数，默认 3 位，精确到毫米级别。
+
+render:
+  colormap: viridis
+
+tiles:
+  profile: raster
+  zoom: 0-5
+  webviewer: none

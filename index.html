@@ -1,0 +1,1061 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PCD Leaflet Map</title>
+  <link rel="stylesheet" href="./dist/leaflet.css">
+  <style>
+    html, body, #map {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: #111;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+
+    .leaflet-container {
+      background: #161a1d;
+      --map-rotation: 0deg;
+    }
+
+    .status-panel {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      z-index: 500;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: #e8eef2;
+      background: rgba(20, 24, 28, 0.84);
+      font-size: 12px;
+      line-height: 1.5;
+      pointer-events: none;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+    }
+
+    .rotation-control,
+    .zoom-control,
+    .tool-control {
+      padding: 8px;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.32);
+      color: #1f2933;
+      font-size: 13px;
+    }
+
+    .rotation-control,
+    .zoom-control {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rotation-control label,
+    .zoom-control label {
+      white-space: nowrap;
+    }
+
+    .rotation-control input,
+    .zoom-control input {
+      width: 58px;
+      box-sizing: border-box;
+      border: 1px solid #b8bec4;
+      border-radius: 4px;
+      padding: 5px 6px;
+      color: #1f2933;
+      background: #fff;
+      font: inherit;
+      text-align: right;
+    }
+
+    .zoom-control input {
+      width: 72px;
+    }
+
+    .rotation-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-left: 4px;
+    }
+
+    .rotation-stepper button,
+    .zoom-stepper button,
+    .tool-control button,
+    .poi-popup button {
+      border: 1px solid #b8bec4;
+      border-radius: 4px;
+      color: #1f2933;
+      background: #f8fafc;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .rotation-stepper button {
+      width: 26px;
+      height: 22px;
+      padding: 0;
+      line-height: 20px;
+      font-weight: 700;
+    }
+
+    .zoom-stepper button {
+      width: 26px;
+      height: 22px;
+      padding: 0;
+      line-height: 20px;
+      font-weight: 700;
+    }
+
+    .tool-control button {
+      display: block;
+      min-width: 104px;
+      padding: 6px 8px;
+    }
+
+    .tool-control button + button {
+      margin-top: 6px;
+    }
+
+    .rotation-stepper button:hover,
+    .zoom-stepper button:hover,
+    .tool-control button:hover,
+    .poi-popup button:hover {
+      background: #eef2f6;
+    }
+
+    .poi-popup {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(54px, 1fr));
+      gap: 6px;
+      min-width: 180px;
+    }
+
+    .poi-popup button {
+      padding: 6px 8px;
+    }
+
+    .poi-marker {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      box-sizing: border-box;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .poi-start { background: #22c55e; }
+    .poi-goal { background: #ef4444; }
+    .poi-waypoint { background: #2563eb; }
+
+    .poi-selected {
+      border-color: #facc15;
+      box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.36), 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .leaflet-tooltip {
+      rotate: calc(-1 * var(--map-rotation));
+      transform-origin: 50% 50%;
+    }
+
+    .marker-upright {
+      width: 100%;
+      height: 100%;
+      rotate: calc(-1 * var(--map-rotation));
+    }
+
+    .poi-upright {
+      transform-origin: 50% 50%;
+    }
+
+    .measure-upright {
+      transform-origin: 14px 32px;
+    }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip-container {
+      rotate: calc(-1 * var(--map-rotation));
+      transform-origin: 50% 100%;
+    }
+
+    .poi-div-icon {
+      overflow: visible;
+    }
+
+    .measure-div-icon {
+      overflow: visible;
+    }
+
+    .measure-marker-pin {
+      position: relative;
+      width: 28px;
+      height: 28px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      background: #4f9fd9;
+      box-shadow: 0 2px 7px rgba(0, 0, 0, 0.42);
+    }
+
+    .measure-marker-pin::after {
+      content: "";
+      position: absolute;
+      left: 9px;
+      top: 9px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #fff;
+    }
+
+    .rotation-center {
+      position: absolute;
+      z-index: 900;
+      display: none;
+      width: 22px;
+      height: 22px;
+      margin-left: -11px;
+      margin-top: -11px;
+      border: 2px solid #ff2d20;
+      border-radius: 50%;
+      pointer-events: none;
+      box-sizing: border-box;
+      box-shadow: 0 0 0 4px rgba(255, 45, 32, 0.18);
+    }
+
+    .rotation-center::before,
+    .rotation-center::after {
+      content: "";
+      position: absolute;
+      background: #ff2d20;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    .rotation-center::before {
+      width: 2px;
+      height: 30px;
+    }
+
+    .rotation-center::after {
+      width: 30px;
+      height: 2px;
+    }
+
+    .zoom-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-left: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="rotation-center" id="rotationCenter"></div>
+  <div class="status-panel" id="status">Loading map...</div>
+
+  <script src="./dist/leaflet.js"></script>
+  <script src="./outputs/map_meta.js"></script>
+  <script>
+    (function () {
+      var zh = {
+        loadingLeafletFailed: "\u65e0\u6cd5\u52a0\u8f7d dist/leaflet.js",
+        loadingMetaFailed: "\u65e0\u6cd5\u52a0\u8f7d outputs/map_meta.js\uff0c\u8bf7\u5148\u8fd0\u884c python process_pcd.py",
+        rotation: "\u65cb\u8f6c",
+        zoom: "\u7f29\u653e",
+        clearMeasure: "\u6e05\u9664\u6d4b\u91cf",
+        clearPoi: "\u6e05\u9664\u5174\u8da3\u70b9",
+        exportPoi: "\u5bfc\u51fa\u5174\u8da3\u70b9",
+        start: "\u8d77\u70b9",
+        goal: "\u7ec8\u70b9",
+        waypoint: "\u9014\u5f84\u70b9",
+        startShort: "\u8d77",
+        goalShort: "\u7ec8",
+        waypointShort: "\u9014",
+        selectPoiFirst: "\u8bf7\u5148\u5355\u51fb\u9009\u62e9\u4e00\u4e2a\u5174\u8da3\u70b9",
+        poiCleared: "\u5174\u8da3\u70b9\u5df2\u6e05\u9664",
+        measureCleared: "\u6d4b\u91cf\u5df2\u6e05\u9664",
+        mapSize: "\u5730\u56fe\u5c3a\u5bf8",
+        resolution: "\u5206\u8fa8\u7387",
+        horizontal: "\u6c34\u5e73\u8ddd\u79bb",
+        verticalDrop: "\u5782\u76f4\u9ad8\u5dee",
+        distance3d: "\u771f\u5b9e 3D \u8ddd\u79bb",
+        meter: "\u7c73"
+      };
+
+      var mapMeta = window.PCD_MAP_META;
+      var statusEl = document.getElementById("status");
+      var rotationCenterEl = document.getElementById("rotationCenter");
+      var blankTile = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+      var rotationDeg = 0;
+      var rotationInput = null;
+      var zoomInput = null;
+      var pendingMeasureClick = null;
+      var suppressNextClick = false;
+      var isRightRotating = false;
+      var pois = [];
+      var selectedPoiId = null;
+      var poiIdSeed = 1;
+
+      window.ROBOT_NAV_POIS = [];
+      window.ROBOT_NAV_POIS_JSON = "[]";
+      window.getRobotNavPoisJson = function () {
+        return window.ROBOT_NAV_POIS_JSON;
+      };
+
+      if (!window.L) {
+        statusEl.textContent = zh.loadingLeafletFailed;
+        return;
+      }
+      if (!mapMeta) {
+        statusEl.textContent = zh.loadingMetaFailed;
+        return;
+      }
+
+      var maxZoom = getMaxTileZoom(mapMeta);
+      var tileSet = buildTileSet(mapMeta);
+      var zArray = decodeZData(mapMeta);
+      var map = createLeafletPixelView(mapMeta, maxZoom, tileSet);
+
+      installRotationControl(map);
+      installZoomControl(map, maxZoom);
+      installRightDragRotation(map);
+      installRotatedPan(map);
+      installRobotNavigationApi(map, mapMeta, maxZoom, zArray);
+      installToolControl(map);
+      installMeasureTool(map);
+      installPoiTool(map);
+      loadStoredPoiState(map);
+      installMouseStatus(map, mapMeta);
+      publishPoiState();
+
+      function createLeafletPixelView(mapMeta, maxZoom, tileSet) {
+        var width = Number(mapMeta.width);
+        var height = Number(mapMeta.height);
+
+        var map = L.map("map", {
+          crs: L.CRS.Simple,
+          minZoom: 0,
+          maxZoom: maxZoom,
+          zoomSnap: 1,
+          zoomDelta: 1,
+          doubleClickZoom: false,
+          zoomControl: false,
+          attributionControl: false
+        });
+
+        var southWest = map.unproject([0, height], maxZoom);
+        var northEast = map.unproject([width, 0], maxZoom);
+        var perfectBounds = L.latLngBounds(southWest, northEast);
+
+        var GdalTileLayer = L.TileLayer.extend({
+          getTileUrl: function (coords) {
+            var tileRows = Math.ceil(height / (256 * Math.pow(2, maxZoom - coords.z)));
+            var gdalY = tileRows - 1 - coords.y;
+            var key = coords.x + "/" + gdalY;
+            if (
+              coords.z < 0 ||
+              coords.z > maxZoom ||
+              coords.x < 0 ||
+              coords.y < 0 ||
+              gdalY < 0 ||
+              (tileSet[coords.z] && !tileSet[coords.z].has(key))
+            ) {
+              return blankTile;
+            }
+
+            return L.Util.template(this._url, {
+              z: coords.z,
+              x: coords.x,
+              y: gdalY
+            });
+          }
+        });
+
+        new GdalTileLayer("./outputs/tiles/{z}/{x}/{y}.png", {
+          minZoom: 0,
+          maxZoom: maxZoom,
+          tileSize: 256,
+          bounds: perfectBounds,
+          noWrap: true,
+          errorTileUrl: blankTile,
+          keepBuffer: 10,
+          updateWhenIdle: false,
+          updateWhenZooming: true
+        }).addTo(map);
+
+        map.fitBounds(perfectBounds, { padding: [16, 16], animate: false });
+        map.setMaxBounds(perfectBounds.pad(0.6));
+        map.dragging.disable();
+        return map;
+      }
+
+      function installRotationControl(map) {
+        var RotationControl = L.Control.extend({
+          options: { position: "topleft" },
+          onAdd: function () {
+            var div = L.DomUtil.create("div", "rotation-control");
+            var label = L.DomUtil.create("label", "", div);
+            rotationInput = L.DomUtil.create("input", "", div);
+            var suffix = L.DomUtil.create("span", "", div);
+            var stepper = L.DomUtil.create("div", "rotation-stepper", div);
+            var plus = L.DomUtil.create("button", "", stepper);
+            var minus = L.DomUtil.create("button", "", stepper);
+
+            label.textContent = zh.rotation;
+            rotationInput.type = "text";
+            rotationInput.inputMode = "numeric";
+            rotationInput.maxLength = 3;
+            rotationInput.value = "0";
+            suffix.textContent = "\u00b0";
+            plus.type = "button";
+            plus.textContent = "+";
+            minus.type = "button";
+            minus.textContent = "-";
+
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
+
+            rotationInput.addEventListener("input", function () {
+              rotationInput.value = rotationInput.value.replace(/\D/g, "").slice(0, 3);
+            });
+            rotationInput.addEventListener("keydown", function (event) {
+              if (event.key === "Enter") {
+                setRotation(Number(rotationInput.value || 0), map);
+                rotationInput.blur();
+              }
+            });
+            rotationInput.addEventListener("blur", updateRotationInput);
+            plus.addEventListener("click", function () {
+              setRotation(rotationDeg + 1, map);
+            });
+            minus.addEventListener("click", function () {
+              setRotation(rotationDeg - 1, map);
+            });
+            return div;
+          }
+        });
+
+        map.addControl(new RotationControl());
+        map.on("move zoom resize", function () {
+          applyRotation(map);
+          updateZoomInput(map, maxZoom);
+          updateRotationCenterMarker(map);
+        });
+        applyRotation(map);
+      }
+
+      function installZoomControl(map, maxZoom) {
+        var ZoomControl = L.Control.extend({
+          options: { position: "topleft" },
+          onAdd: function () {
+            var div = L.DomUtil.create("div", "zoom-control");
+            var label = L.DomUtil.create("label", "", div);
+            zoomInput = L.DomUtil.create("input", "", div);
+            var stepper = L.DomUtil.create("div", "zoom-stepper", div);
+            var plus = L.DomUtil.create("button", "", stepper);
+            var minus = L.DomUtil.create("button", "", stepper);
+            label.textContent = zh.zoom;
+            zoomInput.type = "text";
+            zoomInput.readOnly = true;
+            plus.type = "button";
+            plus.textContent = "+";
+            plus.title = "Zoom in";
+            minus.type = "button";
+            minus.textContent = "-";
+            minus.title = "Zoom out";
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.disableScrollPropagation(div);
+            plus.addEventListener("click", function () {
+              var nextZoom = Math.min(maxZoom, map.getZoom() + 1);
+              map.setZoom(nextZoom, { animate: false });
+            });
+            minus.addEventListener("click", function () {
+              var nextZoom = Math.max(map.getMinZoom(), map.getZoom() - 1);
+              map.setZoom(nextZoom, { animate: false });
+            });
+            updateZoomInput(map, maxZoom);
+            return div;
+          }
+        });
+        map.addControl(new ZoomControl());
+        map.on("zoomend", function () {
+          updateZoomInput(map, maxZoom);
+        });
+      }
+
+      function updateZoomInput(map, maxZoom) {
+        if (!zoomInput) return;
+        var scale = Math.pow(2, map.getZoom() - maxZoom);
+        zoomInput.value = scale.toFixed(3) + "x";
+      }
+
+      function installRightDragRotation(map) {
+        var container = map.getContainer();
+        var startPointerAngle = 0;
+        var startRotation = 0;
+
+        container.addEventListener("contextmenu", function (event) {
+          event.preventDefault();
+        });
+
+        container.addEventListener("mousedown", function (event) {
+          if (event.button !== 2) return;
+          event.preventDefault();
+          event.stopPropagation();
+          isRightRotating = true;
+          suppressNextClick = true;
+          startPointerAngle = getPointerAngle(container, event);
+          startRotation = rotationDeg;
+          showRotationCenter(map);
+          document.body.style.cursor = "grabbing";
+        }, true);
+
+        window.addEventListener("mousemove", function (event) {
+          if (!isRightRotating) return;
+          event.preventDefault();
+          var currentPointerAngle = getPointerAngle(container, event);
+          setRotation(startRotation + currentPointerAngle - startPointerAngle, map);
+        }, true);
+
+        window.addEventListener("mouseup", function (event) {
+          if (!isRightRotating || event.button !== 2) return;
+          event.preventDefault();
+          isRightRotating = false;
+          document.body.style.cursor = "";
+          hideRotationCenter();
+        }, true);
+      }
+
+      function installRotatedPan(map) {
+        var container = map.getContainer();
+        var panning = false;
+        var lastPoint = null;
+        var moved = false;
+
+        container.addEventListener("mousedown", function (event) {
+          if (event.button !== 0 || isRightRotating || isControlTarget(event.target)) return;
+          panning = true;
+          moved = false;
+          lastPoint = L.point(event.clientX, event.clientY);
+          document.body.style.cursor = "grabbing";
+        }, true);
+
+        window.addEventListener("mousemove", function (event) {
+          if (!panning || isRightRotating) return;
+          var point = L.point(event.clientX, event.clientY);
+          var delta = point.subtract(lastPoint);
+          if (Math.abs(delta.x) + Math.abs(delta.y) > 0) {
+            moved = true;
+          }
+          lastPoint = point;
+          var layerDelta = rotateVector(delta, -rotationDeg);
+          map.panBy([-layerDelta.x, -layerDelta.y], { animate: false });
+          applyRotation(map);
+          event.preventDefault();
+          event.stopPropagation();
+        }, true);
+
+        window.addEventListener("mouseup", function (event) {
+          if (!panning || event.button !== 0) return;
+          panning = false;
+          document.body.style.cursor = "";
+          if (moved) {
+            suppressNextClick = true;
+          }
+        }, true);
+      }
+
+      function setRotation(value, map) {
+        rotationDeg = normalizeDegrees(value);
+        applyRotation(map);
+        updateRotationInput();
+        updateRotationCenterMarker(map);
+      }
+
+      function applyRotation(map) {
+        map.getContainer().style.setProperty("--map-rotation", rotationDeg + "deg");
+        getRotatedPanes(map).forEach(function (pane) {
+          if (!pane) return;
+          var origin = getPaneRotationOrigin(map, pane);
+          pane.style.transformOrigin = origin.x + "px " + origin.y + "px";
+          pane.style.rotate = rotationDeg + "deg";
+        });
+      }
+
+      function updateRotationInput() {
+        if (rotationInput) {
+          rotationInput.value = String(Math.round(rotationDeg));
+        }
+      }
+
+      function showRotationCenter(map) {
+        rotationCenterEl.style.display = "block";
+        updateRotationCenterMarker(map);
+      }
+
+      function hideRotationCenter() {
+        rotationCenterEl.style.display = "none";
+      }
+
+      function updateRotationCenterMarker(map) {
+        if (rotationCenterEl.style.display === "none") return;
+        var center = map.latLngToContainerPoint(map.getCenter());
+        var rect = map.getContainer().getBoundingClientRect();
+        rotationCenterEl.style.left = (rect.left + center.x) + "px";
+        rotationCenterEl.style.top = (rect.top + center.y) + "px";
+      }
+
+      function getPointerAngle(container, event) {
+        var center = map.latLngToContainerPoint(map.getCenter());
+        var rect = container.getBoundingClientRect();
+        var cx = rect.left + center.x;
+        var cy = rect.top + center.y;
+        return Math.atan2(event.clientY - cy, event.clientX - cx) * 180 / Math.PI;
+      }
+
+      function getEventLatLng(map, event) {
+        var original = event.originalEvent || event;
+        var rect = map.getContainer().getBoundingClientRect();
+        var center = map.latLngToContainerPoint(map.getCenter());
+        var cx = center.x;
+        var cy = center.y;
+        var x = original.clientX - rect.left;
+        var y = original.clientY - rect.top;
+        var unrotated = rotateAroundCenter(x, y, cx, cy, -rotationDeg);
+        return map.containerPointToLatLng(L.point(unrotated.x, unrotated.y));
+      }
+
+      function installRobotNavigationApi(map, mapMeta, maxZoom, zArray) {
+        window.pixelToPhysical = function pixelToPhysical(latlngOrPx, optionalPy) {
+          var pixelPoint = toPixelPoint(latlngOrPx, optionalPy);
+          var xMeter = Number(mapMeta.minX) + pixelPoint.x * Number(mapMeta.resolution);
+          var yMeter = Number(mapMeta.maxY) - pixelPoint.y * Number(mapMeta.resolution);
+          var zMeter = interpolateZ(pixelPoint.x, pixelPoint.y, mapMeta, zArray);
+          return { x: xMeter, y: yMeter, z: zMeter };
+        };
+
+        window.physicalToPixel = function physicalToPixel(xMeter, yMeter) {
+          var px = (Number(xMeter) - Number(mapMeta.minX)) / Number(mapMeta.resolution);
+          var py = (Number(mapMeta.maxY) - Number(yMeter)) / Number(mapMeta.resolution);
+          return map.unproject([px, py], maxZoom);
+        };
+
+        window.physicalToPixelPoint = function physicalToPixelPoint(xMeter, yMeter) {
+          return {
+            px: (Number(xMeter) - Number(mapMeta.minX)) / Number(mapMeta.resolution),
+            py: (Number(mapMeta.maxY) - Number(yMeter)) / Number(mapMeta.resolution)
+          };
+        };
+
+        function toPixelPoint(latlngOrPx, optionalPy) {
+          if (typeof latlngOrPx === "number") {
+            return L.point(latlngOrPx, optionalPy);
+          }
+          return map.project(latlngOrPx, maxZoom);
+        }
+      }
+
+      function interpolateZ(px, py, mapMeta, zArray) {
+        var zScale = Number(mapMeta.zScale);
+        var zWidth = Number(mapMeta.zWidth);
+        var zHeight = Number(mapMeta.zHeight);
+        var gx = clamp(px / zScale, 0, zWidth - 1);
+        var gy = clamp(py / zScale, 0, zHeight - 1);
+        var x0 = Math.floor(gx);
+        var y0 = Math.floor(gy);
+        var x1 = Math.min(x0 + 1, zWidth - 1);
+        var y1 = Math.min(y0 + 1, zHeight - 1);
+        var tx = gx - x0;
+        var ty = gy - y0;
+        var z00 = getZValue(zArray, mapMeta, y0 * zWidth + x0);
+        var z10 = getZValue(zArray, mapMeta, y0 * zWidth + x1);
+        var z01 = getZValue(zArray, mapMeta, y1 * zWidth + x0);
+        var z11 = getZValue(zArray, mapMeta, y1 * zWidth + x1);
+        var za = z00 * (1 - tx) + z10 * tx;
+        var zb = z01 * (1 - tx) + z11 * tx;
+        return za * (1 - ty) + zb * ty;
+      }
+
+      function decodeZData(mapMeta) {
+        if (mapMeta.zEncoding !== "base64-int32-little-endian") {
+          return mapMeta.zData;
+        }
+        var binary = atob(mapMeta.zData);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i += 1) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return new Int32Array(bytes.buffer);
+      }
+
+      function getZValue(zArray, mapMeta, index) {
+        if (mapMeta.zEncoding === "base64-int32-little-endian") {
+          return zArray[index] / Number(mapMeta.zPrecision);
+        }
+        return Number(zArray[index]);
+      }
+
+      function installToolControl(map) {
+        var ToolControl = L.Control.extend({
+          options: { position: "topright" },
+          onAdd: function () {
+            var div = L.DomUtil.create("div", "tool-control");
+            var clearMeasureButton = L.DomUtil.create("button", "", div);
+            var clearPoiButton = L.DomUtil.create("button", "", div);
+            var exportPoiButton = L.DomUtil.create("button", "", div);
+            clearMeasureButton.type = "button";
+            clearMeasureButton.textContent = zh.clearMeasure;
+            clearPoiButton.type = "button";
+            clearPoiButton.textContent = zh.clearPoi;
+            exportPoiButton.type = "button";
+            exportPoiButton.textContent = zh.exportPoi;
+            L.DomEvent.disableClickPropagation(div);
+            L.DomEvent.on(clearMeasureButton, "click", clearMeasure);
+            L.DomEvent.on(clearPoiButton, "click", function () { clearSelectedPoi(map); });
+            L.DomEvent.on(exportPoiButton, "click", exportPoiJson);
+            return div;
+          }
+        });
+        map.addControl(new ToolControl());
+      }
+
+      var measurePoints = [];
+      var measureMarkers = [];
+      var measureLine = null;
+
+      function installMeasureTool(map) {
+        map.on("click", function (event) {
+          if (isRightRotating || suppressNextClick) {
+            suppressNextClick = false;
+            return;
+          }
+          if (pendingMeasureClick) {
+            clearTimeout(pendingMeasureClick);
+          }
+          pendingMeasureClick = setTimeout(function () {
+            pendingMeasureClick = null;
+            addMeasurePoint(map, event);
+          }, 220);
+        });
+      }
+
+      function addMeasurePoint(map, event) {
+        if (measurePoints.length >= 2) clearMeasure();
+        var latlng = getEventLatLng(map, event);
+        var physical = window.pixelToPhysical(latlng);
+        measurePoints.push({ latlng: latlng, physical: physical });
+        var marker = L.marker(latlng, {
+          icon: createMeasureIcon()
+        }).addTo(map);
+        measureMarkers.push(marker);
+
+        if (measurePoints.length === 1) {
+          marker.bindPopup(formatPointPopup(zh.start, physical)).openPopup();
+          return;
+        }
+
+        var p1 = measurePoints[0].physical;
+        var p2 = measurePoints[1].physical;
+        var dx = p2.x - p1.x;
+        var dy = p2.y - p1.y;
+        var dzForDistance = p2.z - p1.z;
+        var verticalDrop = p1.z - p2.z;
+        var horizontal = Math.sqrt(dx * dx + dy * dy);
+        var distance3d = Math.sqrt(dx * dx + dy * dy + dzForDistance * dzForDistance);
+        measureLine = L.polyline([measurePoints[0].latlng, measurePoints[1].latlng], {
+          color: "#ff4d4f",
+          weight: 3,
+          opacity: 0.95
+        }).addTo(map);
+        marker.bindPopup(
+          zh.horizontal + ":" + horizontal.toFixed(3) + " " + zh.meter + "<br>" +
+          zh.verticalDrop + ":" + verticalDrop.toFixed(3) + " " + zh.meter + "<br>" +
+          "<b>" + zh.distance3d + ":" + distance3d.toFixed(3) + " " + zh.meter + "</b>"
+        ).openPopup();
+      }
+
+      function clearMeasure() {
+        measureMarkers.forEach(function (marker) { map.removeLayer(marker); });
+        measureMarkers = [];
+        measurePoints = [];
+        if (measureLine) {
+          map.removeLayer(measureLine);
+          measureLine = null;
+        }
+        statusEl.textContent = zh.measureCleared;
+      }
+
+      function installPoiTool(map) {
+        map.on("dblclick", function (event) {
+          if (isRightRotating) return;
+          if (pendingMeasureClick) {
+            clearTimeout(pendingMeasureClick);
+            pendingMeasureClick = null;
+          }
+          var latlng = getEventLatLng(map, event);
+          openPoiTypePopup(map, latlng);
+        });
+      }
+
+      function openPoiTypePopup(map, latlng) {
+        var container = L.DomUtil.create("div", "poi-popup");
+        [
+          { type: "start", label: zh.start },
+          { type: "goal", label: zh.goal },
+          { type: "waypoint", label: zh.waypoint }
+        ].forEach(function (item) {
+          var button = L.DomUtil.create("button", "", container);
+          button.type = "button";
+          button.textContent = item.label;
+          button.addEventListener("click", function () {
+            addPoi(map, latlng, item.type);
+            map.closePopup();
+          });
+        });
+        L.popup({ closeButton: true, autoPan: true })
+          .setLatLng(latlng)
+          .setContent(container)
+          .openOn(map);
+      }
+
+      function addPoi(map, latlng, type) {
+        var physical = window.pixelToPhysical(latlng);
+        var pixelPoint = map.project(latlng, maxZoom);
+        var poi = {
+          id: "poi-" + poiIdSeed++,
+          type: type,
+          latlng: latlng,
+          pixel: { px: pixelPoint.x, py: pixelPoint.y },
+          physical: physical,
+          marker: null
+        };
+        poi.marker = L.marker(latlng, {
+          icon: createPoiIcon(type, false),
+          title: getPoiTypeLabel(type)
+        }).addTo(map);
+        poi.marker.on("click", function (event) {
+          if (event.originalEvent) {
+            L.DomEvent.stopPropagation(event.originalEvent);
+          }
+          selectPoi(poi.id);
+          suppressNextClick = true;
+        });
+        pois.push(poi);
+        selectPoi(poi.id);
+        publishPoiState();
+      }
+
+      function selectPoi(id) {
+        selectedPoiId = id;
+        pois.forEach(function (poi) {
+          poi.marker.setIcon(createPoiIcon(poi.type, poi.id === selectedPoiId));
+        });
+      }
+
+      function clearSelectedPoi(map) {
+        if (!selectedPoiId) {
+          statusEl.textContent = zh.selectPoiFirst;
+          return;
+        }
+        var nextPois = [];
+        pois.forEach(function (poi) {
+          if (poi.id === selectedPoiId) {
+            map.removeLayer(poi.marker);
+          } else {
+            nextPois.push(poi);
+          }
+        });
+        pois = nextPois;
+        selectedPoiId = null;
+        publishPoiState();
+        statusEl.textContent = zh.poiCleared;
+      }
+
+      function createPoiIcon(type, selected) {
+        return L.divIcon({
+          className: "poi-div-icon",
+          html: "<div class=\"marker-upright poi-upright\"><div class=\"poi-marker poi-" + type + (selected ? " poi-selected" : "") + "\">" + getPoiTypeShortLabel(type) + "</div></div>",
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+      }
+
+      function createMeasureIcon() {
+        return L.divIcon({
+          className: "measure-div-icon",
+          html: "<div class=\"marker-upright measure-upright\"><div class=\"measure-marker-pin\"></div></div>",
+          iconSize: [28, 34],
+          iconAnchor: [14, 32],
+          popupAnchor: [0, -32]
+        });
+      }
+
+      function publishPoiState() {
+        var data = pois.map(function (poi) {
+          return {
+            id: poi.id,
+            type: poi.type,
+            typeLabel: getPoiTypeLabel(poi.type),
+            pixel: {
+              px: Number(poi.pixel.px.toFixed(3)),
+              py: Number(poi.pixel.py.toFixed(3))
+            },
+            physical: {
+              x: Number(poi.physical.x.toFixed(4)),
+              y: Number(poi.physical.y.toFixed(4)),
+              z: Number(poi.physical.z.toFixed(4))
+            }
+          };
+        });
+        window.ROBOT_NAV_POIS = data;
+        window.ROBOT_NAV_POIS_JSON = JSON.stringify(data, null, 2);
+        try {
+          localStorage.setItem("ROBOT_NAV_POIS_JSON", window.ROBOT_NAV_POIS_JSON);
+        } catch (error) {
+          console.warn("Failed to persist POIs to localStorage.", error);
+        }
+        window.dispatchEvent(new CustomEvent("robot-nav-pois-updated", {
+          detail: { pois: data, json: window.ROBOT_NAV_POIS_JSON }
+        }));
+      }
+
+      function loadStoredPoiState(map) {
+        var raw = null;
+        try {
+          raw = localStorage.getItem("ROBOT_NAV_POIS_JSON");
+        } catch (error) {
+          return;
+        }
+        if (!raw) return;
+        try {
+          JSON.parse(raw).forEach(function (record) {
+            if (!record || !record.physical || !record.type) return;
+            var latlng = window.physicalToPixel(record.physical.x, record.physical.y);
+            addPoi(map, latlng, record.type);
+          });
+        } catch (error) {
+          console.warn("Failed to restore POIs from localStorage.", error);
+        }
+      }
+
+      function exportPoiJson() {
+        var blob = new Blob([window.ROBOT_NAV_POIS_JSON], { type: "application/json" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "robot_nav_pois.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      function getPoiTypeLabel(type) {
+        return { start: zh.start, goal: zh.goal, waypoint: zh.waypoint }[type] || type;
+      }
+
+      function getPoiTypeShortLabel(type) {
+        return { start: zh.startShort, goal: zh.goalShort, waypoint: zh.waypointShort }[type] || "?";
+      }
+
+      function installMouseStatus(map, mapMeta) {
+        statusEl.textContent = zh.mapSize + " " + mapMeta.width + " x " + mapMeta.height +
+          " px, " + zh.resolution + " " + mapMeta.resolution + " m/px";
+        map.on("mousemove", function (event) {
+          if (isRightRotating) return;
+          var latlng = getEventLatLng(map, event);
+          var p = window.pixelToPhysical(latlng);
+          statusEl.textContent = "X " + p.x.toFixed(2) + " m, Y " + p.y.toFixed(2) +
+            " m, Z " + p.z.toFixed(2) + " m, " + zh.rotation + " " + Math.round(rotationDeg) + "\u00b0";
+        });
+      }
+
+      function rotateVector(point, degrees) {
+        var rad = degrees * Math.PI / 180;
+        return L.point(
+          point.x * Math.cos(rad) - point.y * Math.sin(rad),
+          point.x * Math.sin(rad) + point.y * Math.cos(rad)
+        );
+      }
+
+      function rotateAroundCenter(x, y, cx, cy, degrees) {
+        var rad = degrees * Math.PI / 180;
+        var dx = x - cx;
+        var dy = y - cy;
+        return {
+          x: cx + dx * Math.cos(rad) - dy * Math.sin(rad),
+          y: cy + dx * Math.sin(rad) + dy * Math.cos(rad)
+        };
+      }
+
+      function getRotatedPanes(map) {
+        return [
+          map.getPane("tilePane"),
+          map.getPane("overlayPane"),
+          map.getPane("shadowPane"),
+          map.getPane("markerPane"),
+          map.getPane("tooltipPane"),
+          map.getPane("popupPane")
+        ];
+      }
+
+      function getPaneRotationOrigin(map, pane) {
+        var center = map.latLngToLayerPoint(map.getCenter());
+        var panePos = L.DomUtil.getPosition(pane) || L.point(0, 0);
+        return center.subtract(panePos);
+      }
+
+      function isControlTarget(target) {
+        return Boolean(target.closest && target.closest(".leaflet-control"));
+      }
+
+      function getMaxTileZoom(mapMeta) {
+        if (mapMeta.tileIndex) {
+          return Object.keys(mapMeta.tileIndex)
+            .map(function (z) { return Number(z); })
+            .filter(function (z) { return Number.isFinite(z); })
+            .reduce(function (max, z) { return Math.max(max, z); }, 0);
+        }
+        return 5;
+      }
+
+      function buildTileSet(mapMeta) {
+        var result = {};
+        if (!mapMeta.tileIndex) return result;
+        Object.keys(mapMeta.tileIndex).forEach(function (z) {
+          result[Number(z)] = new Set(mapMeta.tileIndex[z]);
+        });
+        return result;
+      }
+
+      function formatPointPopup(label, p) {
+        return label + "<br>X:" + p.x.toFixed(3) + " m<br>Y:" +
+          p.y.toFixed(3) + " m<br>Z:" + p.z.toFixed(3) + " m";
+      }
+
+      function normalizeDegrees(value) {
+        var n = Number.isFinite(value) ? value : 0;
+        n = n % 360;
+        return n < 0 ? n + 360 : n;
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+    })();
+  </script>
+</body>
+</html>
