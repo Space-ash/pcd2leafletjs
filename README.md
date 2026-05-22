@@ -145,19 +145,19 @@ pcd2leafletjs/
 
 ## 安装依赖
 
-推荐使用 Conda 安装 GDAL，再使用 pip 安装其余依赖：
+推荐使用 Conda 安装 GDAL，再使用 `requirement.txt` 安装 Python 依赖：
 
 ```bash
 conda create -n pcd2leafletjs python=3.10
 conda activate pcd2leafletjs
 conda install -c conda-forge gdal
-python -m pip install open3d numpy matplotlib pyyaml scipy
+python -m pip install -r requirement.txt
 ```
 
 如果系统已经正确安装 GDAL，也可以直接使用 pip 安装 Python 包：
 
 ```bash
-python -m pip install open3d numpy matplotlib pyyaml scipy gdal
+python -m pip install -r requirement.txt
 ```
 
 ## 配置说明

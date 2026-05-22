@@ -1,0 +1,9 @@
+# Python dependencies for pcd2leafletjs.
+# GDAL provides osgeo_utils.gdal2tiles. If pip installation fails on Windows,
+# install it with Conda first: conda install -c conda-forge gdal
+open3d
+numpy
+matplotlib
+PyYAML
+scipy
+GDAL
